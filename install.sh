@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
-# Run from a normal Bazzite terminal (not inside the distrobox).
+# Linux install. Run from a normal terminal on the host (not inside the distrobox).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DEST="$HOME/.local/share/anyps5-launcher"
-BOX=anyps5-build
+BOX="${ANYPS5_BOX:-anyps5-build}"
 
 mkdir -p "$DEST"
-cp "$HERE"/launcher.py "$HERE"/convert.sh "$HERE"/update.sh "$HERE"/anyps5-launcher.svg "$DEST"/
-chmod +x "$DEST"/*.sh "$DEST"/launcher.py
+cp "$HERE"/launcher.py "$HERE"/anyps5-launcher.svg "$DEST"/
+rm -f "$DEST"/convert.sh "$DEST"/update.sh
+chmod +x "$DEST"/launcher.py
 
-echo "== installing PySide6 in the $BOX distrobox"
-distrobox enter "$BOX" -- bash -lc "rpm -q python3-pyside6 >/dev/null 2>&1 || sudo dnf install -y python3-pyside6 vulkan-tools"
+if command -v distrobox >/dev/null && distrobox list --no-color 2>/dev/null | awk -F'|' '{gsub(/ /,"",$2); print $2}' | grep -qx "$BOX"; then
+  echo "== installing PySide6 in the $BOX distrobox"
+  distrobox enter "$BOX" -- bash -lc "rpm -q python3-pyside6 >/dev/null 2>&1 || sudo dnf install -y python3-pyside6 vulkan-tools"
+  EXEC="distrobox enter $BOX -- python3 $DEST/launcher.py"
+else
+  echo "== no '$BOX' distrobox, using the host Python"
+  python3 -c "import PySide6" 2>/dev/null || python3 -m pip install --user PySide6
+  EXEC="python3 $DEST/launcher.py"
+fi
 
 mkdir -p "$HOME/.local/share/icons/hicolor/scalable/apps" "$HOME/.local/share/applications"
 cp "$HERE/anyps5-launcher.svg" "$HOME/.local/share/icons/hicolor/scalable/apps/anyps5-launcher.svg"
@@ -21,7 +29,7 @@ cat > "$DESKTOP" <<DESK
 Type=Application
 Name=AnyPS5 Launcher
 Comment=Convert and play PS5 games with AnyPS5
-Exec=distrobox enter $BOX -- python3 $DEST/launcher.py
+Exec=$EXEC
 Icon=anyps5-launcher
 Terminal=false
 Categories=Game;Emulator;
