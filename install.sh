@@ -7,6 +7,7 @@ BOX="${ANYPS5_BOX:-anyps5-build}"
 
 mkdir -p "$DEST"
 cp "$HERE"/launcher.py "$HERE"/anyps5-launcher.svg "$DEST"/
+rm -rf "$DEST/patches" && cp -r "$HERE/patches" "$DEST/patches"
 rm -f "$DEST"/convert.sh "$DEST"/update.sh
 chmod +x "$DEST"/launcher.py
 

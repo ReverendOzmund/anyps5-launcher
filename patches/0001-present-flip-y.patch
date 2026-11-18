@@ -1,0 +1,51 @@
+From eb9169541eb4f92e531be1fd004f2b82434bd726 Mon Sep 17 00:00:00 2001
+From: ReverendOzmund <ReverendOzmund@users.noreply.github.com>
+Date: Wed, 18 Nov 2026 20:33:40 +0800
+Subject: [PATCH] local: ANYPS5_PRESENT_FLIP_Y flips the presented image
+ vertically
+
+---
+ .../Execution/src/PresentationScaler.cpp        | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/core/libs/prx/libSceAgcDriver/Execution/src/PresentationScaler.cpp b/core/libs/prx/libSceAgcDriver/Execution/src/PresentationScaler.cpp
+index 810a32c35f..74bcfd91e1 100644
+--- a/core/libs/prx/libSceAgcDriver/Execution/src/PresentationScaler.cpp
++++ b/core/libs/prx/libSceAgcDriver/Execution/src/PresentationScaler.cpp
+@@ -3,9 +3,22 @@
+ #include "prx/libSceAgcDriver/Execution/include/AspectFit.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/BufferPool.hpp"
+ #include "prx/libSceAgcDriver/Graphics/include/Resources.hpp"
++#include <cstdlib>
+ 
+ namespace AgcDriver {
+ 
++namespace {
++
++bool PresentFlipY() {
++    static const bool flip = [] {
++        const char* value = std::getenv("ANYPS5_PRESENT_FLIP_Y");
++        return value != nullptr && value[0] == '1';
++    }();
++    return flip;
++}
++
++}
++
+ PresentationScaler::PresentationScaler(const Graphics::Context& context, VkFormat sourceFormat, VkFormat destinationFormat) : context(context), sourceFormat(sourceFormat) {
+     Graphics::Require(context.formatProperties != nullptr, "missing Vulkan format property resolver");
+     VkFormatProperties sourceProperties{};
+@@ -169,6 +182,10 @@ void PresentationScaler::RecordStretchFrom(const Graphics::Context& context, VkC
+     blit.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+     blit.dstOffsets[0] = {rect.x, rect.y, 0};
+     blit.dstOffsets[1] = {rect.x + static_cast<std::int32_t>(rect.width), rect.y + static_cast<std::int32_t>(rect.height), 1};
++    if (PresentFlipY()) {
++        blit.srcOffsets[0].y = static_cast<std::int32_t>(height);
++        blit.srcOffsets[1].y = 0;
++    }
+     context.Function<PFN_vkCmdBlitImage>("vkCmdBlitImage")(commands, image, layout, destinationImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, filter);
+ }
+ 
+-- 
+2.43.0
+

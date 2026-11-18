@@ -43,6 +43,16 @@ bash anyps5-launcher/install.sh
 
 If a distrobox named `anyps5-build` exists (the AnyPS5 build box), the launcher is installed and run inside it. Otherwise it uses the host Python and installs PySide6 with pip. In both cases it adds **AnyPS5 Launcher** to the app menu and the desktop.
 
+## Local AnyPS5 patches (source build)
+
+**Update AnyPS5** re-applies every `*.patch` in the launcher's `patches/` folder and in `~/.local/share/anyps5-launcher/patches/` after pulling `main`, then rebuilds. A patch that no longer applies is skipped with a warning.
+
+Bundled patches:
+
+| Patch | What it does |
+|---|---|
+| `0001-present-flip-y.patch` | Adds `ANYPS5_PRESENT_FLIP_Y=1`, which flips the presented picture vertically. Use it with the **Flip picture vertically** game setting for titles that show upside down (GTA V PPSA04263 on an RTX 3080 Ti). It is a workaround, not a fix: screenshots and frame dumps stay unflipped. |
+
 ## Paths
 
 | What | Where |

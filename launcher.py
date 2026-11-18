@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 IS_WIN = sys.platform == "win32"
 HERE = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 HOME = Path.home()
@@ -51,6 +51,7 @@ DEFAULTS = {
     "mimalloc": False,
     "game_mode": "auto",
     "language": "",
+    "flip_y": False,
     "extra_env": "",
 }
 
@@ -289,6 +290,12 @@ class SourceBackend:
         run_cmd(["git", "-C", src, "checkout", "-q", "-f", "main"], log)
         run_cmd(["git", "-C", src, "pull", "--ff-only", "origin", "main"], log)
         run_cmd(["git", "-C", src, "submodule", "update", "--init", "--recursive"], log)
+        for patch in local_patches():
+            try:
+                run_cmd(["git", "-C", src, "apply", str(patch)], log)
+                log(f"applied local patch {patch.name}\n")
+            except Failed:
+                log(f"WARNING: local patch {patch.name} no longer applies to AnyPS5 main, skipped\n")
         self.build(log)
 
     def build(self, log):
@@ -397,6 +404,14 @@ class ReleaseBackend:
                     if pct // 10 != last // 10:
                         log(f"  {pct}% of {total / 1048576:.0f} MiB\n")
                         last = pct
+
+
+def local_patches():
+    found = []
+    for folder in (HERE / "patches", DATA / "patches"):
+        if folder.is_dir():
+            found += sorted(folder.glob("*.patch"))
+    return found
 
 
 def make_backend(prefs):
@@ -540,6 +555,10 @@ class SettingsDialog(QDialog):
         self.game_mode.setCurrentText(settings["game_mode"])
         form.addRow("Game mode" if IS_WIN else "Feral GameMode", self.game_mode)
 
+        self.flip = QCheckBox("Flip picture vertically (workaround, source build only)")
+        self.flip.setChecked(settings["flip_y"])
+        form.addRow("", self.flip)
+
         self.language = QLineEdit(settings["language"])
         self.language.setPlaceholderText("default English US; 'auto' or 0-30")
         form.addRow("Console language", self.language)
@@ -565,6 +584,7 @@ class SettingsDialog(QDialog):
             "mimalloc": self.mimalloc.isChecked(),
             "game_mode": self.game_mode.currentText(),
             "language": self.language.text().strip(),
+            "flip_y": self.flip.isChecked(),
             "extra_env": self.extra.toPlainText().strip(),
         }
 
@@ -909,7 +929,7 @@ class Launcher(QMainWindow):
     def game_env(s):
         env = QProcessEnvironment.systemEnvironment()
         for key in ["ANYPS5_GPU", "ANYPS5_PRESENT_MODE", "ANYPS5_FPS_LIMIT", "ANYPS5_FULLSCREEN",
-                    "APS5_MIMALLOC", "APS5_GAME_MODE", "ANYPS5_LANGUAGE"]:
+                    "APS5_MIMALLOC", "APS5_GAME_MODE", "ANYPS5_LANGUAGE", "ANYPS5_PRESENT_FLIP_Y"]:
             env.remove(key)
         if s["gpu"]:
             env.insert("ANYPS5_GPU", s["gpu"])
@@ -924,6 +944,8 @@ class Launcher(QMainWindow):
         env.insert("APS5_GAME_MODE", s["game_mode"])
         if s["language"]:
             env.insert("ANYPS5_LANGUAGE", s["language"])
+        if s["flip_y"]:
+            env.insert("ANYPS5_PRESENT_FLIP_Y", "1")
         for line in s["extra_env"].splitlines():
             line = line.strip()
             if "=" in line and not line.startswith("#"):
