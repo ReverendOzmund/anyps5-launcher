@@ -52,6 +52,7 @@ Bundled patches:
 | Patch | What it does |
 |---|---|
 | `0001-present-flip-y.patch` | Adds `ANYPS5_PRESENT_FLIP_Y=1`, which flips the presented picture vertically. Use it with the **Flip picture vertically** game setting for titles that show upside down (GTA V PPSA04263 on an RTX 3080 Ti). It is a workaround, not a fix: screenshots and frame dumps stay unflipped. |
+| `0002-diag-viewport.patch` | Adds `APS5_DIAG_VIEWPORT=1`, which logs each distinct viewport and render-target setup once (`[diag-viewport]` lines). Diagnostic only, for tracking down rendering bugs. |
 
 ## Paths
 

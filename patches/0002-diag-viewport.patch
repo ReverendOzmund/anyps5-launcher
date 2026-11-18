@@ -1,0 +1,64 @@
+From 020704433c20e601db4470d3ba7dce2433cf04c1 Mon Sep 17 00:00:00 2001
+From: ReverendOzmund <ReverendOzmund@users.noreply.github.com>
+Date: Wed, 18 Nov 2026 20:53:32 +0800
+Subject: [PATCH] local: APS5_DIAG_VIEWPORT logs each distinct viewport setup
+ once
+
+---
+ .../libSceAgcDriver/Graphics/src/State.cpp    | 30 +++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+diff --git a/core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp b/core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp
+index cbcabc9647..95b7c9280c 100644
+--- a/core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp
++++ b/core/libs/prx/libSceAgcDriver/Graphics/src/State.cpp
+@@ -21,9 +21,37 @@
+ #include <array>
+ #include <sstream>
+ #include <string_view>
++#include <mutex>
++#include <string>
++#include <unordered_set>
+ 
+ namespace AgcDriver::Graphics {
+ 
++namespace {
++
++void DiagnoseViewport(std::uint32_t control, float xs, float ys, float xo, float yo, const State& state) {
++    static const bool enabled = [] {
++        const char* value = std::getenv("APS5_DIAG_VIEWPORT");
++        return value != nullptr && value[0] == '1';
++    }();
++    if (!enabled) return;
++    static std::mutex lock;
++    static std::unordered_set<std::string> seen;
++    char line[512];
++    std::snprintf(line, sizeof(line),
++        "[diag-viewport] vte=0x%x scale=(%g,%g) offset=(%g,%g) -> vk(x=%g y=%g w=%g h=%g) extent=%ux%u color=0x%llx %ux%u colors=%zu depth=%d rect=%d quad=%d topo=%d path=%d",
++        control, xs, ys, xo, yo, state.viewport.x, state.viewport.y, state.viewport.width, state.viewport.height,
++        state.renderExtent.width, state.renderExtent.height,
++        static_cast<unsigned long long>(state.hasColorTarget ? state.color.address : 0), state.hasColorTarget ? state.color.extent.width : 0u,
++        state.hasColorTarget ? state.color.extent.height : 0u, state.colors.size(), state.depth ? 1 : 0, state.rectList ? 1 : 0, state.quadList ? 1 : 0,
++        static_cast<int>(state.topology), static_cast<int>(state.stages.path));
++    const std::lock_guard guard(lock);
++    if (seen.size() >= 2000 || !seen.insert(line).second) return;
++    std::fprintf(stderr, "%s #%zu\n", line, seen.size());
++}
++
++}
++
+ void NormalizeUnusedViewportDepth(State& state, const ShaderRecompiler::ShaderPixelStageInfo& pixel) {
+     if (state.depth || pixel.posZ) return;
+     for (auto& extra : state.extraViewports) {
+@@ -1948,6 +1976,8 @@ State DecodeState(const QueueState& queue, bool vertexWorkgroup) {
+         result.viewport.maxDepth = result.depth->clearDepth;
+         result.depthBias = false;
+     }
++    if (viewportControl == 0u) DiagnoseViewport(viewportControl, 0, 0, 0, 0, result);
++    else DiagnoseViewport(viewportControl, readFloat(cx, 0x10f), readFloat(cx, 0x111), readFloat(cx, 0x110), readFloat(cx, 0x112), result);
+     APS5_LOG_OUT_DEBUG("Viewport x=%f y=%f w=%f h=%f minDepth=%f maxDepth=%f", result.viewport.x, result.viewport.y, result.viewport.width, result.viewport.height, result.viewport.minDepth, result.viewport.maxDepth);
+     result.scissor = {{0, 0}, result.renderExtent};
+     intersect(result.scissor, cx, 0xc, true);
+-- 
+2.43.0
+
